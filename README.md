@@ -15,10 +15,10 @@ const INCLITODBNAME = ''; //Name Database
 const INCLITOUSER = ''; //User Connection
 const INCLITOPWD = ''; //Password Database
 const INCLITODRIVER = 'mysql'; //Driver Default
-const INCLITOTYPECONN = false; // Persistent true or false, default false;
+const INCLITOTYPECONN = false; //Persistent true or false, default false;
 
 //Certificate SSL
-const INCLITOBOOLCERT = false; //Default false.
+const INCLITOBOOLCERT = false; //Default false
 const INCLITOMYCA = ''; //File CA
 const INCLITOMYCERT = ''; //File CERT
 const INCLITOMYKEY =  ''; //File KEY
