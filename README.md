@@ -17,11 +17,8 @@ const INCLITOPWD = ''; //Password Database
 const INCLITODRIVER = 'mysql'; //Driver Default
 const INCLITOTYPECONN = false; // Persistent true or false, default false;
 
-//Certificate SSL default false.
-const INCLITOBOOLCERT = false; //Port Default
-
 //Certificate SSL
-const INCLITOBOOLCERT = false; //Port Default false
+const INCLITOBOOLCERT = false; //Default false.
 const INCLITOMYCA = ''; //File CA
 const INCLITOMYCERT = ''; //File CERT
 const INCLITOMYKEY =  ''; //File KEY
