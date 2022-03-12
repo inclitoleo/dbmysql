@@ -1,0 +1,24 @@
+{
+    "name": "inclitoleo/dbmysql",
+    "description": "Object-oriented query builders for MySQL can be used with database connection library.",
+    "type": "library",
+    "license": "GPL-3.0-or-later",
+    "autoload": {
+        "psr-4": {
+            "Inclitoleo\\Mysql\\": "src/"
+        },
+        "files": [
+            "config.php"
+        ]
+    },
+    "authors": [
+        {
+            "name": "LeoCosta",
+            "email": "linclitoleo@yandex.com",
+            "role": "developer"
+        }
+    ],
+    "require": {
+        "php": ">=7.2"
+    }
+}
