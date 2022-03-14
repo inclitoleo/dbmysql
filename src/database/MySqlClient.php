@@ -3,6 +3,7 @@
 namespace Inclitoleo\Mysql\database;
 
 use PDO;
+use PDOException;
 
 /**
  * Name of the class that contains the database manipulation handling methods.
@@ -47,9 +48,9 @@ class MySqlClient extends DataBaseConnection
                 $options = array
                 (
                     PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES UTF8MB4",
-                    PDO::MYSQL_ATTR_SSL_KEY=>INCLITOMYKEY,
-                    PDO::MYSQL_ATTR_SSL_CERT=>INCLITOMYCERT,
-                    PDO::MYSQL_ATTR_SSL_CA=>INCLITOMYCA,
+                    PDO::MYSQL_ATTR_SSL_KEY => INCLITOMYKEY,
+                    PDO::MYSQL_ATTR_SSL_CERT => INCLITOMYCERT,
+                    PDO::MYSQL_ATTR_SSL_CA => INCLITOMYCA,
                     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                     PDO::ATTR_PERSISTENT => INCLITOTYPECONN
                 );
@@ -59,10 +60,9 @@ class MySqlClient extends DataBaseConnection
             $this->driver->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 
-
-        } catch (\PDOException $e) {
-            echo '##Verify configurations of the Database.##'.PHP_EOL ;
-            echo $e->getMessage() .' (Line file: '.$e->getLine().') '.$e->getFile().PHP_EOL;
+        } catch (PDOException $e) {
+            echo '##Verify configurations of the Database.##' . PHP_EOL;
+            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
         }
     }
 
@@ -99,8 +99,8 @@ class MySqlClient extends DataBaseConnection
                 return $this->driver->lastInsertId();
             }
 
-        } catch (\PDOException $e) {
-            echo $e->getMessage() .' (Line file: '.$e->getLine().') '.$e->getFile().PHP_EOL;
+        } catch (PDOException $e) {
+            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
         }
 
         return false;
@@ -121,7 +121,7 @@ class MySqlClient extends DataBaseConnection
         $condition = NULL;
 
         if ($field && $value) {
-            $condition = " WHERE {$field} = ?";
+            $condition = " WHERE " . $field . " = ?";
         }
 
         $queryString = "SELECT * FROM " . $table . $condition;
@@ -138,8 +138,8 @@ class MySqlClient extends DataBaseConnection
             }
 
 
-        } catch (\PDOException $e) {
-            echo $e->getMessage() .' (Line file: '.$e->getLine().') '.$e->getFile().PHP_EOL;
+        } catch (PDOException $e) {
+            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
 
         }
 
@@ -152,7 +152,7 @@ class MySqlClient extends DataBaseConnection
      * @abstract
      * @param string $table - Name of table in database
      * @param array|bool $sort - Array for sort, array('field','type') type:(ASC or DESC)
-     * @return array Returns only one row within an object.
+     * @return array|bool Returns only one row within an object.
      */
     public function select_s(string $table, $sort = FALSE): array
     {
@@ -171,8 +171,8 @@ class MySqlClient extends DataBaseConnection
                 return $stmt->fetchAll(PDO::FETCH_OBJ);
             }
 
-        } catch (\PDOException $e) {
-            echo $e->getMessage() .' (Line file: '.$e->getLine().') '.$e->getFile().PHP_EOL;
+        } catch (PDOException $e) {
+            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
         }
 
         return false;
@@ -184,7 +184,7 @@ class MySqlClient extends DataBaseConnection
      * @abstract
      * @param string $sqlSelect - SQL Statement
      * @param string $type - Whether to return one or all lines [U = Unique / A = All] (Default -> U)
-     * @return array Array of returned data
+     * @return array|bool Array of returned data
      */
     public function select_all(string $sqlSelect, string $type = "U"): array
     {
@@ -200,8 +200,8 @@ class MySqlClient extends DataBaseConnection
             }
 
 
-        } catch (\PDOException $e) {
-            echo $e->getMessage() .' (Line file: '.$e->getLine().') '.$e->getFile().PHP_EOL;
+        } catch (PDOException $e) {
+            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
         }
 
         return false;
@@ -247,9 +247,11 @@ class MySqlClient extends DataBaseConnection
                 return true;
             }
 
-        } catch (\PDOException $e) {
-            echo $e->getMessage() .' (Line file: '.$e->getLine().') '.$e->getFile().PHP_EOL;
+        } catch (PDOException $e) {
+            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
         }
+
+        return false;
     }
 
     /**
@@ -265,7 +267,7 @@ class MySqlClient extends DataBaseConnection
     {
         try {
 
-            $queryString = "DELETE FROM " . $table . " WHERE {$field} = ?";
+            $queryString = "DELETE FROM " . $table . " WHERE " . $field . " = ?";
 
             $stmt = $this->driver->prepare($queryString);
             $stmt->bindValue(1, $value);
@@ -275,8 +277,8 @@ class MySqlClient extends DataBaseConnection
             }
 
 
-        } catch (\PDOException $e) {
-            echo $e->getMessage() .' (Line file: '.$e->getLine().') '.$e->getFile().PHP_EOL;
+        } catch (PDOException $e) {
+            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
         }
 
         return false;
@@ -286,7 +288,7 @@ class MySqlClient extends DataBaseConnection
      * @abstract
      * Initiate an SLQ transaction in case of error perform rollback
      * @param string $sql
-     * @return array
+     * @return array|bool
      *
      */
     public function execute(string $sql): array
@@ -300,25 +302,27 @@ class MySqlClient extends DataBaseConnection
 
             return $stmt->fetchAll(PDO::FETCH_OBJ);
 
-        } catch (\PDOException $e) {
+        } catch (PDOException $e) {
             $this->driver->rollBack();
-            echo $e->getMessage() .' (Line file: '.$e->getLine().') '.$e->getFile().PHP_EOL;
+            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
         }
-    }
 
+        return false;
+    }
 
     /**
      * @return array
      */
-    public function getEncapsulateKey()
+    public function getEncapsulateKey(): array
     {
         return $this->encapsulateKey;
     }
 
     /**
      * @param array $encapsulateKey
+     * @return void
      */
-    public function setEncapsulateKey($encapsulateKey)
+    public function setEncapsulateKey(array $encapsulateKey)
     {
         $this->encapsulateKey = $encapsulateKey;
     }
@@ -329,7 +333,7 @@ class MySqlClient extends DataBaseConnection
      * @param string $string - String to take effect
      * @return string String change
      */
-    protected function escapeString(string $string)
+    protected function escapeString(string $string): string
     {
         return preg_replace("/'/is", "''", $string);
     }
