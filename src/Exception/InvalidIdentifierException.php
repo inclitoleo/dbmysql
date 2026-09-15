@@ -14,8 +14,9 @@ class InvalidIdentifierException extends MysqlException
         private readonly string $reason = '',
         int $code = 0,
         ?Throwable $previous = null,
+        bool $debug = false,
     ) {
-        parent::__construct($message, $code, $previous);
+        parent::__construct($message, $code, $previous, ErrorCode::FORBIDDEN, $debug);
     }
 
     public function getIdentifier(): string

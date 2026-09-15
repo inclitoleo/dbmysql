@@ -35,3 +35,4 @@ services:
       MYSQL_DATABASE: dbmysql_lab
       MYSQL_USER: dbmysql
       MYSQL_PASSWORD: dbmysql
+      DBMYSQL_DEBUG: "0"

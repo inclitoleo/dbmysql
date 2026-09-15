@@ -31,6 +31,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame('utf8mb4', $config->charset);
         $this->assertFalse($config->sslEnabled);
         $this->assertFalse($config->persistent);
+        $this->assertFalse($config->debug);
     }
 
     public function testEmptyHostThrowsBeforePdo(): void

@@ -29,8 +29,10 @@ try {
         $builder->delete('account', ['id' => $id]);
         $flash = "Deleted account id {$id}.";
     }
-} catch (Throwable $e) {
+} catch (\Inclitoleo\Mysql\Exception\MysqlException $e) {
     $error = $e->getMessage();
+} catch (Throwable $e) {
+    $error = '{"code":500}';
 }
 
 $accounts = $builder->from('account')->select(['id', 'name', 'email'])->get();
@@ -53,7 +55,7 @@ $h = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBS
 </head>
 <body>
 <h1>dbmysql CRUD lab</h1>
-<p>Pacote instalado via Composer em <code>vendor/inclitoleo/dbmysql</code>.</p>
+<p>Pacote instalado via Composer em <code>vendor/inclitoleo/dbmysql</code>. Debug da lib: <code>DBMYSQL_DEBUG=0</code> (JSON <code>{"code":500}</code>); <code>1</code> mostra o SQLSTATE cru.</p>
 <?php if ($flash !== ''): ?><p class="ok"><?= $h($flash) ?></p><?php endif; ?>
 <?php if ($error !== ''): ?><p class="err"><?= $h($error) ?></p><?php endif; ?>
 

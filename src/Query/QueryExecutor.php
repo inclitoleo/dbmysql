@@ -109,6 +109,7 @@ final class QueryExecutor
             $sqlState,
             (int) $e->getCode(),
             $e,
+            $this->connections->isDebug(),
         );
     }
 

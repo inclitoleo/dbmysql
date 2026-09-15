@@ -10,7 +10,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Inclitoleo\\Mysql\\Tests\\": "tests/"
+            "Inclitoleo\\Mysql\\Tests\\": "tests/",
+            "Inclitoleo\\Mysql\\Tests\\Fixtures\\": "tests/fixtures/"
         }
     },
     "authors": [

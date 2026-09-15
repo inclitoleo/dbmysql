@@ -20,8 +20,9 @@ function dbmysql_lab_builder(): QueryBuilder
         port: (int) (getenv('MYSQL_PORT') ?: '3306'),
         database: getenv('MYSQL_DATABASE') ?: 'dbmysql_lab',
         username: getenv('MYSQL_USER') ?: 'dbmysql',
-        password: getenv('MYSQL_PASSWORD') ?: 'dbmysql',
-    ));
+            password: getenv('MYSQL_PASSWORD') ?: 'dbmysql',
+            debug: getenv('DBMYSQL_DEBUG') === '1',
+        ));
 
     $schema = new SchemaRegistry();
     $schema->register('account', ['id', 'name', 'email']);

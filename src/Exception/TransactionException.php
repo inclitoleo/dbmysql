@@ -13,8 +13,13 @@ class TransactionException extends MysqlException
         private readonly ?string $sqlState = null,
         int $code = 0,
         ?Throwable $previous = null,
+        bool $debug = false,
     ) {
-        parent::__construct($message, $code, $previous);
+        $publicCode = $previous instanceof MysqlException
+            ? $previous->publicCode()
+            : ErrorCode::fromSqlState($sqlState, $code);
+
+        parent::__construct($message, $code, $previous, $publicCode, $debug);
     }
 
     public function getSqlState(): ?string

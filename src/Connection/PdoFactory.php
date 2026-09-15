@@ -66,6 +66,7 @@ final class PdoFactory
                 self::sqlStateFrom($e),
                 (int) $e->getCode(),
                 $e,
+                $config->debug,
             );
         }
     }

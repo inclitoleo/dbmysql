@@ -52,6 +52,8 @@ final class QueryExecutorTest extends TestCase
             $this->assertSame('SELECT nope', $e->getSql());
             $this->assertSame([1], $e->getBindings());
             $this->assertSame('42000', $e->getSqlState());
+            $this->assertSame('{"code":500}', $e->getMessage());
+            $this->assertStringContainsString('Query failed:', $e->getDetail());
         }
     }
 

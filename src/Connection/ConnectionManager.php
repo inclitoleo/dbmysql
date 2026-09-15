@@ -110,6 +110,7 @@ final class ConnectionManager
                 $sqlState,
                 (int) $e->getCode(),
                 $e,
+                $this->isDebug(),
             );
         }
     }
@@ -122,6 +123,11 @@ final class ConnectionManager
     public function logger(): ?LoggerInterface
     {
         return $this->logger;
+    }
+
+    public function isDebug(): bool
+    {
+        return $this->endpoints['primary']->debug ?? false;
     }
 
     public function disconnect(): void

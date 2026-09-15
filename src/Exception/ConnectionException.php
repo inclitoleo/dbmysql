@@ -13,8 +13,15 @@ class ConnectionException extends MysqlException
         private readonly ?string $sqlState = null,
         int $code = 0,
         ?Throwable $previous = null,
+        bool $debug = false,
     ) {
-        parent::__construct($message, $code, $previous);
+        parent::__construct(
+            $message,
+            $code,
+            $previous,
+            ErrorCode::fromSqlState($sqlState, $code),
+            $debug,
+        );
     }
 
     public function getSqlState(): ?string

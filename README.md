@@ -220,6 +220,30 @@ Streaming memory tests honor `DBMYSQL_STREAM_ROWS` (default 1000) and `DBMYSQL_S
 
 CI (GitHub Actions) runs PHP 8.1 / 8.2 / 8.3: lint, unit, integration against MySQL 8.4, security, regression, and v3 coverage (`>= 90%` on `Connection`, `Query`, `Security`, `Exception`, `Mapper`).
 
+## Debug and public error codes
+
+`ConnectionConfig::$debug` defaults to `false`. Failures still throw `MysqlException`; the **public** contract is JSON with only a status code:
+
+| Code | Meaning |
+|---|---|
+| `200` | `ErrorCode::ok()` — success helper for the caller |
+| `403` | Identifier rejected / access denied |
+| `404` | Missing table/column or `firstOrFail()` / `findByIdOrFail()` |
+| `500` | Query, constraint, or other operational failure |
+
+```php
+try {
+    $builder->insert('account', ['name' => 'Leo', 'email' => 'leo@example.com']);
+    echo Inclitoleo\Mysql\Exception\ErrorCode::ok(); // {"code":200}
+} catch (Inclitoleo\Mysql\Exception\MysqlException $e) {
+    echo $e->getMessage();
+    // debug=false → {"code":500}
+    // debug=true  → Query failed: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry ...
+}
+```
+
+Raw SQL, bindings and emails stay on `getDetail()` / `getSql()` for logs — they are not in `getMessage()` unless `debug` is true.
+
 ## Exceptions
 
 | Class | When |
@@ -229,4 +253,5 @@ CI (GitHub Actions) runs PHP 8.1 / 8.2 / 8.3: lint, unit, integration against My
 | `ConnectionException` | PDO connect failure |
 | `QueryException` | SQL execution failure (`getSql()`, `getBindings()`, `getSqlState()`) |
 | `InvalidIdentifierException` | Table/column/operator rejected |
+| `NotFoundException` | Empty `firstOrFail()` / `findByIdOrFail()` (`{"code":404}`) |
 | `TransactionException` | Failure inside `transaction()` after rollback |

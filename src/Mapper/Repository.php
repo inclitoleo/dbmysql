@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Inclitoleo\Mysql\Mapper;
 
 use Inclitoleo\Mysql\Connection\ConnectionManager;
+use Inclitoleo\Mysql\Exception\NotFoundException;
 use Inclitoleo\Mysql\Query\QueryBuilder;
 use Inclitoleo\Mysql\Security\SchemaRegistry;
 use Psr\Log\LoggerInterface;
@@ -41,6 +42,16 @@ abstract class Repository
         }
 
         return $this->mapper->fromRow($row, $this->entityClass());
+    }
+
+    public function findByIdOrFail(int|string $id): object
+    {
+        $entity = $this->findById($id);
+        if ($entity === null) {
+            throw new NotFoundException('Record not found', $this->connection->isDebug());
+        }
+
+        return $entity;
     }
 
     public function insert(object $dto): int|string

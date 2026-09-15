@@ -79,9 +79,13 @@ final class IdentifierValidatorTest extends TestCase
     public function testSchemaRegistryRejectsUnregisteredTable(): void
     {
         $schema = new SchemaRegistry();
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('users; DROP TABLE account');
-        $schema->requireTable('users; DROP TABLE account');
+        try {
+            $schema->requireTable('users; DROP TABLE account');
+            $this->fail('Expected InvalidIdentifierException');
+        } catch (InvalidIdentifierException $e) {
+            $this->assertSame('users; DROP TABLE account', $e->getIdentifier());
+            $this->assertSame('{"code":403}', $e->getMessage());
+        }
     }
 
     public function testSchemaRegistryRejectsUnregisteredColumn(): void

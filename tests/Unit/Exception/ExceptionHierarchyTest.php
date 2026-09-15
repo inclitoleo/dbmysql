@@ -60,7 +60,9 @@ final class ExceptionHierarchyTest extends TestCase
         $e = new ConfigurationException('port');
 
         $this->assertInstanceOf(MysqlException::class, $e);
-        $this->assertSame('port', $e->getMessage());
+        $this->assertSame('port', $e->getDetail());
+        $this->assertSame('{"code":500}', $e->getMessage());
+        $this->assertSame(500, $e->publicCode());
     }
 
     public function testExceptionsPropagateThroughCatchOfBaseType(): void

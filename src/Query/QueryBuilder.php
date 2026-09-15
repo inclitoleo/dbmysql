@@ -8,6 +8,7 @@ use Generator;
 use Inclitoleo\Mysql\Connection\ConnectionManager;
 use Inclitoleo\Mysql\Exception\ConfigurationException;
 use Inclitoleo\Mysql\Exception\InvalidIdentifierException;
+use Inclitoleo\Mysql\Exception\NotFoundException;
 use Inclitoleo\Mysql\Exception\QueryException;
 use Inclitoleo\Mysql\Security\IdentifierValidator;
 use Inclitoleo\Mysql\Security\SchemaRegistry;
@@ -281,6 +282,16 @@ final class QueryBuilder
         $rows = $this->limit(1)->get();
 
         return $rows[0] ?? null;
+    }
+
+    public function firstOrFail(): object
+    {
+        $row = $this->first();
+        if ($row === null) {
+            throw new NotFoundException('Record not found', $this->isDebug());
+        }
+
+        return $row;
     }
 
     /**
@@ -575,10 +586,15 @@ final class QueryBuilder
     private function requireExecutor(): QueryExecutor
     {
         if ($this->executor === null) {
-            throw new ConfigurationException('QueryBuilder has no connection to execute SQL.');
+            throw new ConfigurationException('QueryBuilder has no connection to execute SQL.', 0, null, $this->isDebug());
         }
 
         return $this->executor;
+    }
+
+    private function isDebug(): bool
+    {
+        return $this->connection?->isDebug() ?? false;
     }
 
     /**
