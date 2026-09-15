@@ -9,7 +9,7 @@ use Inclitoleo\Mysql\Security\SchemaRegistry;
 
 function dbmysql_lab_builder(): QueryBuilder
 {
-    $package = dirname(__DIR__) . '/vendor/inclitoleo/dbmysql/composer.json';
+    $package = __DIR__ . '/vendor/inclitoleo/dbmysql/composer.json';
     if (!is_file($package)) {
         fwrite(STDERR, "inclitoleo/dbmysql is not installed in vendor/. Run composer install.\n");
         exit(1);
