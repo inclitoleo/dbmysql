@@ -5,7 +5,10 @@ composer.phar
 .phpunit.result.cache
 coverage.xml
 coverage/
-sandbox/vendor/
+sandbox/
+
+# Local CRUD lab — not part of the Composer package
+docker-compose.sandbox.yml
 
 # Local planning / agent files — not part of the Composer package
 .cursor/

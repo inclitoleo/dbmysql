@@ -52,6 +52,7 @@ $manager = new ConnectionManager(new ConnectionConfig(
     database: 'app',
     username: 'app',
     password: 'secret',
+    debug: false, // default: public JSON codes only
 ));
 
 $schema = new SchemaRegistry();
@@ -179,18 +180,6 @@ const INCLITOMYKEY = '';
 const INCLITOSTRICT = false;
 ```
 
-## CRUD lab (Docker)
-
-Sobe MySQL 8.4 e um app PHP que instala `inclitoleo/dbmysql` via Composer (path repository, cópia em `vendor/` — sem symlink). Não publica no Packagist.
-
-```shell
-docker compose -f docker-compose.sandbox.yml up --build
-```
-
-- Smoke test CRUD no log do container `app`
-- UI: http://localhost:8088
-- MySQL: `127.0.0.1:3311` (user/password `dbmysql`, database `dbmysql_lab`)
-
 ## Tests
 
 PHPUnit 10 suites: `unit`, `integration`, `security`, `regression`.
@@ -220,29 +209,47 @@ Streaming memory tests honor `DBMYSQL_STREAM_ROWS` (default 1000) and `DBMYSQL_S
 
 CI (GitHub Actions) runs PHP 8.1 / 8.2 / 8.3: lint, unit, integration against MySQL 8.4, security, regression, and v3 coverage (`>= 90%` on `Connection`, `Query`, `Security`, `Exception`, `Mapper`).
 
-## Debug and public error codes
+## Debug
 
-`ConnectionConfig::$debug` defaults to `false`. Failures still throw `MysqlException`; the **public** contract is JSON with only a status code:
+`ConnectionConfig::$debug` defaults to **`false`**. Failures always throw `MysqlException`; what changes is the **public** message.
 
-| Code | Meaning |
-|---|---|
-| `200` | `ErrorCode::ok()` — success helper for the caller |
-| `403` | Identifier rejected / access denied |
-| `404` | Missing table/column or `firstOrFail()` / `findByIdOrFail()` |
-| `500` | Query, constraint, or other operational failure |
+| `debug` | `getMessage()` | Use |
+|---|---|---|
+| `false` (default, production) | JSON only, e.g. `{"code":500}` | Safe to return to the client |
+| `true` (local) | Raw driver text, e.g. `Query failed: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'leo@example.com' for key 'account.uq_account_email'` | Screen / logs while developing |
 
 ```php
+use Inclitoleo\Mysql\Exception\ErrorCode;
+use Inclitoleo\Mysql\Exception\MysqlException;
+
+$manager = new ConnectionManager(new ConnectionConfig(
+    host: '127.0.0.1',
+    database: 'app',
+    username: 'app',
+    password: 'secret',
+    debug: false, // set true only on a local machine
+));
+
 try {
     $builder->insert('account', ['name' => 'Leo', 'email' => 'leo@example.com']);
-    echo Inclitoleo\Mysql\Exception\ErrorCode::ok(); // {"code":200}
-} catch (Inclitoleo\Mysql\Exception\MysqlException $e) {
-    echo $e->getMessage();
-    // debug=false → {"code":500}
-    // debug=true  → Query failed: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry ...
+    echo ErrorCode::ok(); // {"code":200}
+} catch (MysqlException $e) {
+    echo $e->getMessage(); // debug=false → {"code":500}  |  debug=true → SQLSTATE cru
+    echo $e->toJson();     // always {"code":N}
+    // $e->getDetail(), getSql(), getBindings() — for your logger, never for the client
 }
 ```
 
-Raw SQL, bindings and emails stay on `getDetail()` / `getSql()` for logs — they are not in `getMessage()` unless `debug` is true.
+Public codes:
+
+| Code | Meaning |
+|---|---|
+| `200` | Success helper (`ErrorCode::ok()`). Not thrown; you emit it after a successful call. |
+| `403` | Identifier rejected or MySQL access denied |
+| `404` | Missing table/column, or empty `firstOrFail()` / `findByIdOrFail()` |
+| `500` | Query, constraint (duplicate key, FK), deadlock, or other operational failure |
+
+SQL, bindings and PII stay off `getMessage()` unless `debug` is `true`. Keep `debug` off in production.
 
 ## Exceptions
 

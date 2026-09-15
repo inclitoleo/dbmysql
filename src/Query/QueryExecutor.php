@@ -107,7 +107,7 @@ final class QueryExecutor
             $sql,
             $bindings,
             $sqlState,
-            (int) $e->getCode(),
+            PdoFactory::driverCodeFrom($e),
             $e,
             $this->connections->isDebug(),
         );

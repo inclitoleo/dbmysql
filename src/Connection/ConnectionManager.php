@@ -105,10 +105,14 @@ final class ConnectionManager
                 'error' => $e->getMessage(),
             ]);
 
+            $driverCode = $e instanceof PDOException
+                ? PdoFactory::driverCodeFrom($e)
+                : (int) $e->getCode();
+
             throw new TransactionException(
                 'Transaction failed: ' . $e->getMessage(),
                 $sqlState,
-                (int) $e->getCode(),
+                $driverCode,
                 $e,
                 $this->isDebug(),
             );

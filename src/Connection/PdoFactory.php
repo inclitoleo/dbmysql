@@ -64,11 +64,24 @@ final class PdoFactory
             throw new ConnectionException(
                 'Failed to connect to MySQL: ' . $e->getMessage(),
                 self::sqlStateFrom($e),
-                (int) $e->getCode(),
+                self::driverCodeFrom($e),
                 $e,
                 $config->debug,
             );
         }
+    }
+
+    public static function driverCodeFrom(PDOException $e): int
+    {
+        if (isset($e->errorInfo[1]) && is_numeric($e->errorInfo[1])) {
+            return (int) $e->errorInfo[1];
+        }
+        if (preg_match('/\[(\d{3,5})\]/', $e->getMessage(), $matches) === 1) {
+            return (int) $matches[1];
+        }
+        $code = $e->getCode();
+
+        return is_numeric($code) ? (int) $code : 0;
     }
 
     public static function sqlStateFrom(PDOException $e): ?string
