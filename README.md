@@ -1,49 +1,28 @@
 # dbmysql
 
-Simple, fast and objective PHP library for connecting to MySQL and running parameterized queries.
+Simple, fast PHP library for MySQL. Write SQL when you want SQL. Use the builder only when it saves you time.
 
 Package: `inclitoleo/dbmysql`  
 Namespace: `Inclitoleo\Mysql\`  
 PHP: `>= 8.1`  
 License: GPL-3.0-or-later
 
-Existing `MySqlClient` callers keep working through a deprecated compatibility facade. New code should use `ConnectionManager` and `QueryBuilder`.
+Existing `MySqlClient` callers keep working through a deprecated compatibility facade.
 
 ## Install
 
 ```shell
-composer require inclitoleo/dbmysql
+composer require inclitoleo/dbmysql:^3.0
 ```
 
-## Architecture (v3)
+## Connect once
 
-```
-Application
-    ↓
-Repository (opt-in)
-    ↓
-QueryBuilder  ←  SchemaRegistry + IdentifierValidator
-    ↓
-ConnectionManager → PDO
-    ↓
-ProxySQL / MySQL 8.x
-```
-
-- **ConnectionManager** — injectable `ConnectionConfig`, single or persistent strategies, optional read/write split, `transaction()`.
-- **QueryBuilder** — immutable SELECT composition, batch insert, upsert, cursor pagination, streaming, CTEs, window functions.
-- **SchemaRegistry** — whitelist of table/column identifiers. Unregistered or invalid identifiers throw `InvalidIdentifierException` before SQL runs.
-- **EntityMapper / Repository** — opt-in DTO mapping. No Active Record, no lazy load.
-- **MySqlClient** — deprecated v2 facade over the v3 layer.
-
-v3 never prints errors. Failures throw typed exceptions (`MysqlException` and subclasses). Values always go through native prepared statements (`PDO::ATTR_EMULATE_PREPARES = false`).
-
-## v3 quick start
+Register tables once at bootstrap. After that, pass a full query or use the builder — same connection.
 
 ```php
 use Inclitoleo\Mysql\Connection\ConnectionConfig;
 use Inclitoleo\Mysql\Connection\ConnectionManager;
 use Inclitoleo\Mysql\Query\QueryBuilder;
-use Inclitoleo\Mysql\Query\SortDirection;
 use Inclitoleo\Mysql\Security\SchemaRegistry;
 
 $manager = new ConnectionManager(new ConnectionConfig(
@@ -52,13 +31,112 @@ $manager = new ConnectionManager(new ConnectionConfig(
     database: 'app',
     username: 'app',
     password: 'secret',
-    debug: false, // default: public JSON codes only
+    debug: false,
 ));
 
 $schema = new SchemaRegistry();
 $schema->register('account', ['id', 'name', 'email']);
+$schema->register('orders', ['id', 'account_id', 'total']);
+$schema->register('logs', ['id', 'message', 'created_at']);
 
 $builder = new QueryBuilder($schema, $manager);
+```
+
+Values always go through native prepared statements (`PDO::ATTR_EMULATE_PREPARES = false`). Failures throw typed exceptions — v3 never `echo`s errors.
+
+## Run SQL as you wrote it
+
+You do **not** have to go through `from()` / `where()` / `select()`. `raw()` executes the statement as-is. Bind values with `?`.
+
+```php
+$accounts = $builder->raw('SELECT * FROM account');
+
+$one = $builder->raw('SELECT * FROM account WHERE id = ?', [1]);
+
+$builder->raw('UPDATE account SET name = ? WHERE id = ?', ['Ada', 1]);
+```
+
+`SELECT` / `WITH` / `SHOW` / `EXPLAIN` return a list of objects. Other statements return the affected row count.
+
+### Join
+
+There is no join builder. Pass the join in the SQL:
+
+```php
+$rows = $builder->raw(
+    'SELECT a.id, a.name, o.total
+     FROM account a
+     INNER JOIN orders o ON o.account_id = a.id
+     WHERE a.id = ?',
+    [1],
+);
+
+$left = $builder->raw(
+    'SELECT a.name, o.total
+     FROM account a
+     LEFT JOIN orders o ON o.account_id = a.id',
+);
+```
+
+Tables named after `FROM` / `JOIN` / `INTO` / `UPDATE` must be registered. Table aliases (`a`, `o`) are ignored.
+
+### CTE
+
+Same idea — the whole query, including `WITH`:
+
+```php
+$rows = $builder->raw(
+    'WITH recent AS (
+         SELECT account_id, SUM(total) AS spent
+         FROM orders
+         GROUP BY account_id
+     )
+     SELECT a.name, r.spent
+     FROM account a
+     INNER JOIN recent r ON r.account_id = a.id',
+);
+```
+
+CTE names (`recent`) do not need to be registered. Base tables (`account`, `orders`) do.
+
+Or compose the CTE with the builder and keep the outer query small:
+
+```php
+$recent = (new QueryBuilder($schema))
+    ->from('orders')
+    ->select(['account_id', 'total']);
+
+$rows = $builder
+    ->with('recent', $recent)
+    ->from('recent')
+    ->select(['account_id', 'total'])
+    ->get();
+
+// string subquery also works
+$rows = $builder
+    ->with('recent', 'SELECT account_id, SUM(total) AS spent FROM orders GROUP BY account_id')
+    ->from('recent')
+    ->select(['account_id', 'spent'])
+    ->get();
+```
+
+Window function:
+
+```php
+$rows = $builder
+    ->from('account')
+    ->select(['id', 'name'])
+    ->rowNumber('rank', partitionBy: 'id', orderBy: 'id')
+    ->get();
+// SELECT id, name, ROW_NUMBER() OVER (PARTITION BY id ORDER BY id) AS rank FROM account
+```
+
+## Query builder (optional)
+
+Use it when chaining is shorter than writing SQL. Skip it when it is not.
+
+```php
+use Inclitoleo\Mysql\Query\SortDirection;
 
 $rows = $builder
     ->from('account')
@@ -67,22 +145,23 @@ $rows = $builder
     ->orderBy('name', SortDirection::ASC)
     ->limit(10)
     ->get();
+
+$one = $builder->from('account')->where('email', '=', 'ada@example.com')->first();
+$id = $builder->insert('account', ['name' => 'Ada', 'email' => 'ada@example.com']);
 ```
 
 ### Schema whitelist
 
-Identifiers must match `^[a-zA-Z_][a-zA-Z0-9_]*$` **and** be registered:
+Identifiers must match `^[a-zA-Z_][a-zA-Z0-9_]*$` **and** be registered (this applies to `raw()` too):
 
 ```php
-$schema->register('account', ['id', 'name', 'email']);
-$schema->register('orders', ['id', 'account_id', 'total']);
-
 $builder->from('account')->select(['id', 'name']); // ok
-$builder->from('account; DROP TABLE users');       // InvalidIdentifierException
-$builder->from('account')->select(['password_hash']); // InvalidIdentifierException
+$builder->raw('SELECT * FROM account');           // ok
+$builder->from('account; DROP TABLE users');      // InvalidIdentifierException
+$builder->raw('SELECT * FROM account; DROP TABLE account'); // InvalidIdentifierException
 ```
 
-Register tables once at bootstrap. `MySqlClient` auto-registers identifiers that pass the charset check so v2 callers do not need a manual registry.
+`MySqlClient` auto-registers identifiers that pass the charset check so v2 callers do not need a manual registry.
 
 ### Transactions, batch, upsert, cursor pagination
 
@@ -119,6 +198,20 @@ $manager = new ConnectionManager($config, logger: $psrLogger);
 ```
 
 Errors are logged at `error` with SQL and SQLSTATE when available.
+
+## Architecture
+
+```
+Application
+    ↓
+QueryBuilder.raw(sql)  or  from()/where()/get()
+    ↓
+SchemaRegistry (whitelist) + IdentifierValidator
+    ↓
+ConnectionManager → PDO → MySQL 8.x / ProxySQL
+```
+
+Entity mapper / `Repository` are opt-in. No Active Record, no lazy load.
 
 ## Migrate from v2 (`MySqlClient`)
 
@@ -158,8 +251,12 @@ Recommended replacement:
 // before
 $db = new MySqlClient();
 $row = $db->select('account', 'id', 1);
+$all = $db->select_all('SELECT * FROM account WHERE id = 1', 'A');
 
-// after
+// after — same SQL you already had
+$all = $builder->raw('SELECT * FROM account WHERE id = ?', [1]);
+
+// or the builder, if you prefer
 $row = $builder->from('account')->where('id', '=', 1)->first();
 ```
 
