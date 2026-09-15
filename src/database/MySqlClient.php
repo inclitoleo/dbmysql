@@ -1,263 +1,176 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Inclitoleo\Mysql\database;
 
+use Inclitoleo\Mysql\Connection\ConnectionManager;
+use Inclitoleo\Mysql\Exception\MysqlException;
+use Inclitoleo\Mysql\Exception\InvalidIdentifierException;
+use Inclitoleo\Mysql\Query\QueryBuilder;
+use Inclitoleo\Mysql\Query\SortDirection;
+use Inclitoleo\Mysql\Security\IdentifierValidator;
+use Inclitoleo\Mysql\Security\SchemaRegistry;
 use PDO;
-use PDOException;
+use Throwable;
 
 /**
- * Name of the class that contains the database manipulation handling methods.
- * Driver: mysql Server (MySQL)
+ * Compatibility facade over the v3 layer. Prefer ConnectionManager + QueryBuilder.
  *
+ * @deprecated Use Inclitoleo\Mysql\Connection\ConnectionManager and Inclitoleo\Mysql\Query\QueryBuilder instead.
  * @name MySqlClient
- * @author @author LeoCosta (Inclitoleo) <inclitoleo@yandex.com>
+ * @author LeoCosta (Inclitoleo) <inclitoleo@yandex.com>
  * @copyright Copyright (c) 2022
  * @created 2011-02-15 22:04
- * @revision 2022-03-12 12:19
+ * @revision 2026-09-14
  * @file MySqlClient.php
- * @version v2.0.2022
- *
+ * @version v3.0.0
  */
 class MySqlClient extends DataBaseConnection
 {
     /**
      * key capsule
-     * @var    array
+     * @var array
      */
-    protected $encapsulateKey = array("`", "`");
+    protected $encapsulateKey = ['`', '`'];
 
     /**
-     * $driver connection
-     * @var    string
+     * @var PDO|null
      */
     protected $driver;
 
+    private ?ConnectionManager $manager = null;
+
+    private SchemaRegistry $schema;
+
     public function __construct()
     {
+        $this->schema = new SchemaRegistry();
         try {
-
-            $dns = "{$this->Conn()->driver}:host={$this->Conn()->host};port={$this->Conn()->port};dbname={$this->Conn()->database}";
-
-            $options = array
-            (
-                PDO::ATTR_PERSISTENT => INCLITOTYPECONN,
-                PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES UTF8MB4"
-            );
-
-            if (INCLITOBOOLCERT) {
-                $options = array
-                (
-                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES UTF8MB4",
-                    PDO::MYSQL_ATTR_SSL_KEY => INCLITOMYKEY,
-                    PDO::MYSQL_ATTR_SSL_CERT => INCLITOMYCERT,
-                    PDO::MYSQL_ATTR_SSL_CA => INCLITOMYCA,
-                    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-                    PDO::ATTR_PERSISTENT => INCLITOTYPECONN
-                );
-            }
-
-            $this->driver = new PDO($dns, $this->Conn()->username, $this->Conn()->password, $options);
-            $this->driver->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-
-        } catch (PDOException $e) {
-            echo '##Verify configurations of the Database.##' . PHP_EOL;
-            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
+            $this->manager = new ConnectionManager($this->connectionConfigFromConstants());
+            $this->driver = $this->manager->pdo();
+        } catch (MysqlException $e) {
+            $this->fail($e, true);
         }
     }
 
     /**
      * Insert data into the database
      *
-     * @abstract
      * @param string $table - Get the name of the table.
      * @param object $objValues - Receives the object with the values to be inserted.
-     * @return integer last value inserted
+     * @return integer|false last value inserted
      */
-    public function insert(string $table, object $objValues): int
+    public function insert(string $table, object $objValues): int|false
     {
-        $fields = array();
-        $values = array();
-
-        foreach ($objValues as $key => $v) {
-            $fields[] = $key;
-            $values[] = "?";
-        }
-
-        $queryString = "INSERT INTO " . $table . " (" . implode(", ", $fields) . ")
-							VALUES (" . implode(", ", $values) . ")";
-
         try {
-            $stmt = $this->driver->prepare($queryString);
-            $i = 1;
+            $this->registerFromObject($table, $objValues);
+            $id = $this->builder()->insert($table, $objValues);
 
-            foreach ($objValues as $value) {
-                $stmt->bindValue($i++, $value);
-            }
-
-            if ($stmt->execute()) {
-                return $this->driver->lastInsertId();
-            }
-
-        } catch (PDOException $e) {
-            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
+            return (int) $id;
+        } catch (Throwable $e) {
+            return $this->fail($e);
         }
-
-        return false;
     }
-
 
     /**
      * Returns an element inside the object
      *
-     * @abstract
      * @param string $table - Name of table in database
      * @param string $field - Database field to be compared default FALSE
      * @param int|float|string $value - Default search element FALSE
-     * @return object|boolean Returns only one row within an object.
+     * @return object|false Returns only one row within an object.
      */
     public function select(string $table, string $field, $value)
     {
-        $condition = NULL;
-
-        if ($field && $value) {
-            $condition = " WHERE " . $field . " = ?";
-        }
-
-        $queryString = "SELECT * FROM " . $table . $condition;
-
         try {
-            $stmt = $this->driver->prepare($queryString);
-
-            if (!empty($condition)) {
-                $stmt->bindParam(1, $value);
+            $columns = ($field !== '') ? [$field] : [];
+            $this->allowTable($table, $columns);
+            $query = $this->builder()->from($table);
+            if ($field !== '' && $value !== false && $value !== null && $value !== '') {
+                $query = $query->where($field, '=', $value);
             }
+            $row = $query->first();
 
-            if ($stmt->execute()) {
-                return $stmt->fetchObject();
-            }
-
-
-        } catch (PDOException $e) {
-            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
-
+            return $row === null ? false : $row;
+        } catch (Throwable $e) {
+            return $this->fail($e);
         }
-
-        return false;
     }
 
     /**
      * Returns multiple elements within the object
      *
-     * @abstract
      * @param string $table - Name of table in database
      * @param array|bool $sort - Array for sort, array('field','type') type:(ASC or DESC)
-     * @return array|bool Returns only one row within an object.
+     * @return array|false Returns only one row within an object.
      */
-    public function select_s(string $table, $sort = FALSE): array
+    public function select_s(string $table, $sort = false): array|false
     {
-        $bysort = '';
-
-        if ($sort) {
-            $bysort = " ORDER BY " . $sort[0] . " " . $sort[1];
-        }
-
-        $queryString = "SELECT * FROM " . $table . $bysort;
-
         try {
-            $stmt = $this->driver->prepare($queryString);
-
-            if ($stmt->execute()) {
-                return $stmt->fetchAll(PDO::FETCH_OBJ);
+            $columns = is_array($sort) && isset($sort[0]) ? [(string) $sort[0]] : [];
+            $this->allowTable($table, $columns);
+            $query = $this->builder()->from($table);
+            if (is_array($sort) && isset($sort[0], $sort[1])) {
+                $query = $query->orderBy((string) $sort[0], SortDirection::from(strtoupper((string) $sort[1])));
             }
 
-        } catch (PDOException $e) {
-            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
+            return $query->get();
+        } catch (Throwable $e) {
+            return $this->fail($e);
         }
-
-        return false;
     }
 
     /**
      * Returns one or several elements within the object (via entire query)
      *
-     * @abstract
      * @param string $sqlSelect - SQL Statement
      * @param string $type - Whether to return one or all lines [U = Unique / A = All] (Default -> U)
-     * @return array|bool Array of returned data
+     * @return object|array|false Array of returned data
      */
-    public function select_all(string $sqlSelect, string $type = "U"): array
+    public function select_all(string $sqlSelect, string $type = 'U'): object|array|false
     {
         try {
-            $stmt = $this->driver->prepare($sqlSelect);
-
-            $stmt->execute();
-
-            if (strtoupper($type) == "U") {
-                return $stmt->fetchObject();
-            } elseif (strtoupper($type) == "A") {
-                return $stmt->fetchAll(PDO::FETCH_OBJ);
+            $this->registerIdentifiersFromSql($sqlSelect);
+            $rows = $this->builder()->raw($sqlSelect, []);
+            if (!is_array($rows)) {
+                return false;
+            }
+            if (strtoupper($type) === 'A') {
+                return $rows;
             }
 
-
-        } catch (PDOException $e) {
-            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
+            return $rows[0] ?? false;
+        } catch (Throwable $e) {
+            return $this->fail($e);
         }
-
-        return false;
     }
 
     /**
      * Updates data in the database of a given element
      *
-     * @abstract
      * @param string $table - Database table
      * @param object $objValues Object with values to update
-     * (
-     *      "field_1->new_value_1",
-     *      "field_2->new_value_2",
-     *      [...]
-     * )
      * @param string $field - Field used as criteria
      * @param string $value - Value used as criterion
      * @return boolean true on success or false otherwise
      */
     public function update(string $table, object $objValues, string $field, string $value): bool
     {
-        $fields = array();
-        $values = array();
-
-        foreach ($objValues as $key => $_value) {
-            $fields[] = $key . " = ?";
-            $values[] = $_value;
-        }
-
-        $values[] = $value;
-
-        $queryString = "UPDATE " . $table . " SET " . implode(", ", $fields) . " WHERE " . $field . " = ?";
-
         try {
-            $stmt = $this->driver->prepare($queryString);
+            $this->registerFromObject($table, $objValues);
+            $this->allowTable($table, [$field]);
+            $this->builder()->update($table, get_object_vars($objValues), [$field => $value]);
 
-            for ($i = 1; $i <= count($values); $i++) {
-                $stmt->bindValue($i, $values[$i - 1]);
-            }
-
-            if ($stmt->execute()) {
-                return true;
-            }
-
-        } catch (PDOException $e) {
-            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
+            return true;
+        } catch (Throwable $e) {
+            return $this->fail($e);
         }
-
-        return false;
     }
 
     /**
      * Removes data from the database of a given element
      *
-     * @abstract
      * @param string $table - Database table
      * @param string $field - Field used as criteria
      * @param int|float|string $value - Value used as criteria
@@ -266,48 +179,40 @@ class MySqlClient extends DataBaseConnection
     public function delete(string $table, string $field, $value): bool
     {
         try {
+            $this->allowTable($table, [$field]);
+            $this->builder()->delete($table, [$field => $value]);
 
-            $queryString = "DELETE FROM " . $table . " WHERE " . $field . " = ?";
-
-            $stmt = $this->driver->prepare($queryString);
-            $stmt->bindValue(1, $value);
-
-            if ($stmt->execute()) {
-                return $stmt->rowCount();
-            }
-
-
-        } catch (PDOException $e) {
-            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
+            return true;
+        } catch (Throwable $e) {
+            return $this->fail($e);
         }
-
-        return false;
     }
 
     /**
-     * @abstract
-     * Initiate an SLQ transaction in case of error perform rollback
-     * @param string $sql
-     * @return array|bool
+     * Initiate an SQL transaction in case of error perform rollback.
+     * SELECT statements are executed without wrapping a long transaction.
      *
+     * @param string $sql
+     * @return array|false
      */
-    public function execute(string $sql): array
+    public function execute(string $sql): array|false
     {
         try {
+            $this->registerIdentifiersFromSql($sql);
+            if (preg_match('/^\s*(SELECT|SHOW|EXPLAIN|DESCRIBE|DESC|WITH)\b/i', $sql) === 1) {
+                $rows = $this->builder()->raw($sql, []);
 
-            $this->driver->beginTransaction();
-            $stmt = $this->driver->prepare($sql);
-            $stmt->execute();
-            $this->driver->commit();
+                return is_array($rows) ? $rows : [];
+            }
 
-            return $stmt->fetchAll(PDO::FETCH_OBJ);
+            $this->manager()->transaction(function () use ($sql): void {
+                $this->builder()->raw($sql, []);
+            });
 
-        } catch (PDOException $e) {
-            $this->driver->rollBack();
-            echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
+            return [];
+        } catch (Throwable $e) {
+            return $this->fail($e);
         }
-
-        return false;
     }
 
     /**
@@ -335,7 +240,98 @@ class MySqlClient extends DataBaseConnection
      */
     protected function escapeString(string $string): string
     {
-        return preg_replace("/'/is", "''", $string);
+        return preg_replace("/'/is", "''", $string) ?? $string;
     }
 
+    public function manager(): ConnectionManager
+    {
+        if ($this->manager === null) {
+            throw new MysqlException('MySqlClient is not connected.');
+        }
+
+        return $this->manager;
+    }
+
+    public function schema(): SchemaRegistry
+    {
+        return $this->schema;
+    }
+
+    private function builder(): QueryBuilder
+    {
+        return new QueryBuilder($this->schema, $this->manager());
+    }
+
+    /**
+     * @param list<string> $columns
+     */
+    private function allowTable(string $table, array $columns = []): void
+    {
+        $validColumns = [];
+        foreach ($columns as $column) {
+            if ($column !== '' && IdentifierValidator::isValid($column)) {
+                $validColumns[] = $column;
+            } elseif ($column !== '') {
+                IdentifierValidator::requireValid($column);
+            }
+        }
+        $this->schema->register($table, $validColumns);
+    }
+
+    private function registerFromObject(string $table, object $objValues): void
+    {
+        $columns = [];
+        foreach ($objValues as $key => $_) {
+            $columns[] = (string) $key;
+        }
+        $this->allowTable($table, $columns);
+    }
+
+    private function registerIdentifiersFromSql(string $sql): void
+    {
+        if (str_contains($this->stripSqlLiterals($sql), ';')) {
+            throw new InvalidIdentifierException(
+                'Stacked queries are not allowed.',
+                ';',
+                'raw SQL contains multiple statements',
+            );
+        }
+        $stripped = $this->stripSqlLiterals($sql);
+        if (preg_match_all('/\b(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+`?([A-Za-z_][A-Za-z0-9_]*)`?/i', $stripped, $matches) > 0) {
+            foreach ($matches[1] as $table) {
+                if (strtoupper($table) === 'SELECT') {
+                    continue;
+                }
+                $this->allowTable($table);
+            }
+        }
+    }
+
+    private function stripSqlLiterals(string $sql): string
+    {
+        $withoutStrings = preg_replace("/('(?:''|[^'])*')|(\"(?:\\\\\"|[^\"])*\")/", ' ', $sql) ?? $sql;
+
+        return preg_replace('/--.*$/m', ' ', $withoutStrings) ?? $withoutStrings;
+    }
+
+    private function isStrict(): bool
+    {
+        return defined('INCLITOSTRICT') && INCLITOSTRICT === true;
+    }
+
+    /**
+     * @return false
+     */
+    private function fail(Throwable $e, bool $connectionPrefix = false): mixed
+    {
+        if ($this->isStrict() || !$e instanceof MysqlException) {
+            throw $e;
+        }
+        if ($connectionPrefix) {
+            echo '##Verify configurations of the Database.##' . PHP_EOL;
+        }
+        echo $e->getMessage() . ' (Line file: ' . $e->getLine() . ') ' . $e->getFile() . PHP_EOL;
+
+        return false;
+    }
 }
