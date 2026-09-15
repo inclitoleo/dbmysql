@@ -224,6 +224,29 @@ final class QueryBuilderTest extends TestCase
         $this->builder->raw('SELECT * FROM secret_table WHERE id = ?', [1]);
     }
 
+    public function testRawJoinWithRegisteredTablesReachesExecutor(): void
+    {
+        $this->expectException(ConfigurationException::class);
+        $this->builder->raw(
+            'SELECT a.id, o.total FROM account a INNER JOIN orders o ON o.account_id = a.id WHERE a.id = ?',
+            [1],
+        );
+    }
+
+    public function testRawCteAliasDoesNotNeedSchemaRegistration(): void
+    {
+        $this->expectException(ConfigurationException::class);
+        $this->builder->raw(
+            'WITH recent AS (SELECT account_id, total FROM orders) SELECT a.id FROM account a INNER JOIN recent r ON r.account_id = a.id',
+        );
+    }
+
+    public function testRawJoinUnregisteredTableIsRejected(): void
+    {
+        $this->expectException(InvalidIdentifierException::class);
+        $this->builder->raw('SELECT * FROM account INNER JOIN ghost g ON g.id = account.id');
+    }
+
     public function testWithStackedSubqueryIsRejected(): void
     {
         $this->expectException(InvalidIdentifierException::class);

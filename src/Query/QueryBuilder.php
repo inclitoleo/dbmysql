@@ -532,7 +532,11 @@ final class QueryBuilder
     private function assertRawSql(string $sql): void
     {
         $this->assertNoStackedQueries($sql);
+        $cteNames = $this->extractCteNames($sql);
         foreach ($this->extractTables($sql) as $table) {
+            if (in_array($table, $cteNames, true)) {
+                continue;
+            }
             $this->schema->requireTable($table);
         }
     }
@@ -547,6 +551,26 @@ final class QueryBuilder
                 'raw SQL contains multiple statements',
             );
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extractCteNames(string $sql): array
+    {
+        $stripped = $this->stripSqlLiterals($sql);
+        if (preg_match('/^\s*WITH\s+/i', $stripped) !== 1) {
+            return [];
+        }
+        if (preg_match_all(
+            '/(?:WITH(?:\s+RECURSIVE)?|,)\s+`?([A-Za-z_][A-Za-z0-9_]*)`?\s+AS\s*\(/i',
+            $stripped,
+            $matches,
+        ) === 0) {
+            return [];
+        }
+
+        return array_values(array_unique($matches[1]));
     }
 
     /**
