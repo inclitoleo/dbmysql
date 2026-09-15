@@ -4,7 +4,7 @@ set -e
 cd /app
 
 echo "Installing inclitoleo/dbmysql via Composer (path repository /package)..."
-composer install --no-interaction --no-progress
+composer update --no-interaction --no-progress --prefer-dist
 
 if [ ! -f vendor/inclitoleo/dbmysql/composer.json ]; then
   echo "Composer did not install inclitoleo/dbmysql into vendor/."
