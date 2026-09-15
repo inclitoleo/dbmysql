@@ -1,11 +1,16 @@
 {
     "name": "inclitoleo/dbmysql",
-    "description": "Object-oriented query builders for MySQL can be used with database connection library.",
+    "description": "Simple, fast and objective library for connecting and querying MySQL databases.",
     "type": "library",
     "license": "GPL-3.0-or-later",
     "autoload": {
         "psr-4": {
             "Inclitoleo\\Mysql\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Inclitoleo\\Mysql\\Tests\\": "tests/"
         }
     },
     "authors": [
@@ -16,7 +21,19 @@
         }
     ],
     "require": {
-        "php": ">=7.2",
-        "ext-pdo": "*"
+        "php": ">=8.1",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "psr/log": "^2.0 || ^3.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10"
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test-unit": "phpunit --testsuite=unit",
+        "test-integration": "phpunit --testsuite=integration",
+        "test-security": "phpunit --testsuite=security",
+        "test-regression": "phpunit --testsuite=regression"
     }
 }

@@ -1,0 +1,23 @@
+{
+    "name": "inclitoleo/dbmysql-crud-lab",
+    "description": "Local CRUD lab that installs inclitoleo/dbmysql via Composer (path repository).",
+    "type": "project",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.1",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "inclitoleo/dbmysql": "*@dev"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "/package",
+            "options": {
+                "symlink": false
+            }
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
