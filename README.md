@@ -1,6 +1,6 @@
 # dbmysql
 
-Simple, fast PHP library for MySQL. Write SQL when you want SQL. Use the builder only when it saves you time.
+Simple, fast MySQL library for PHP. Write SQL when you want SQL. Use the builder only when it saves you time. Works beside **Laravel**, **CakePHP**, and **Symfony** — it does not replace Eloquent, Cake ORM, or Doctrine.
 
 Package: `inclitoleo/dbmysql`  
 Namespace: `Inclitoleo\Mysql\`  
@@ -41,6 +41,97 @@ $schema->register('logs', ['id', 'message', 'created_at']);
 
 $builder = new QueryBuilder($schema, $manager);
 ```
+
+## Laravel, CakePHP, Symfony
+
+Same `QueryBuilder`. Credentials come from the framework. Register tables once, then `raw()` or the builder.
+
+### Laravel
+
+Auto-discovery registers `QueryBuilder`. Publish optional table config:
+
+```shell
+php artisan vendor:publish --tag=dbmysql-config
+```
+
+```php
+// config/dbmysql.php
+'tables' => [
+    'account' => ['id', 'name', 'email'],
+    'orders' => ['id', 'account_id', 'total'],
+],
+'debug' => false,
+```
+
+```php
+use Inclitoleo\Mysql\Query\QueryBuilder;
+
+public function index(QueryBuilder $db)
+{
+    return $db->raw('SELECT * FROM account WHERE id = ?', [1]);
+}
+```
+
+Uses `config/database.php` (`DB_*` / `database.connections.mysql`) by default.
+
+Without auto-discovery:
+
+```php
+$config = ConnectionConfig::fromArray(config('database.connections.mysql'));
+```
+
+### CakePHP
+
+```php
+use Cake\Core\Configure;
+use Inclitoleo\Mysql\Connection\ConnectionConfig;
+use Inclitoleo\Mysql\Connection\ConnectionManager;
+use Inclitoleo\Mysql\Query\QueryBuilder;
+use Inclitoleo\Mysql\Security\SchemaRegistry;
+
+$config = ConnectionConfig::fromArray(Configure::read('Datasources.default'));
+$schema = new SchemaRegistry();
+$schema->register('account', ['id', 'name', 'email']);
+$builder = new QueryBuilder($schema, new ConnectionManager($config));
+
+$accounts = $builder->raw('SELECT * FROM account');
+```
+
+`Datasources.default` in `app.php` / `app_local.php` (`host`, `username`, `password`, `database`, `encoding`) maps as-is.
+
+### Symfony
+
+`DATABASE_URL` from `.env`:
+
+```env
+DATABASE_URL="mysql://app:!Passw0rd@127.0.0.1:3306/app?charset=utf8mb4"
+```
+
+```yaml
+# config/services.yaml
+Inclitoleo\Mysql\Connection\ConnectionConfig:
+    factory: ['Inclitoleo\Mysql\Connection\ConnectionConfig', 'fromDsn']
+    arguments: ['%env(DATABASE_URL)%']
+
+Inclitoleo\Mysql\Connection\ConnectionManager:
+    arguments: ['@Inclitoleo\Mysql\Connection\ConnectionConfig']
+
+Inclitoleo\Mysql\Security\SchemaRegistry: ~
+
+Inclitoleo\Mysql\Query\QueryBuilder:
+    arguments: ['@Inclitoleo\Mysql\Security\SchemaRegistry', '@Inclitoleo\Mysql\Connection\ConnectionManager']
+```
+
+```php
+public function index(QueryBuilder $db): JsonResponse
+{
+    return $this->json($db->raw('SELECT * FROM account'));
+}
+```
+
+Register tables in a compiler pass, a kernel boot listener, or a small decorator — same `SchemaRegistry::register()` as a plain PHP app.
+
+Doctrine connection arrays work too: `ConnectionConfig::fromArray($doctrineParams)` (`dbname`, `user`, `host`, `port`, `charset`).
 
 Values always go through native prepared statements (`PDO::ATTR_EMULATE_PREPARES = false`). Failures throw typed exceptions — v3 never `echo`s errors.
 
