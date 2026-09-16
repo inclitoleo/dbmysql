@@ -1,7 +1,16 @@
 {
     "name": "inclitoleo/dbmysql",
-    "description": "Simple, fast and objective library for connecting and querying MySQL databases.",
+    "description": "Simple, fast MySQL library for PHP. Raw SQL or query builder. Compatible with Laravel, CakePHP, and Symfony.",
     "type": "library",
+    "keywords": [
+        "mysql",
+        "pdo",
+        "query-builder",
+        "laravel",
+        "cakephp",
+        "symfony"
+    ],
+    "homepage": "https://github.com/inclitoleo/dbmysql",
     "license": "GPL-3.0-or-later",
     "autoload": {
         "psr-4": {
@@ -29,6 +38,18 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^10"
+    },
+    "suggest": {
+        "illuminate/support": "Laravel auto-discovery of QueryBuilder from config/database.php",
+        "symfony/framework-bundle": "Wire QueryBuilder from DATABASE_URL",
+        "cakephp/cakephp": "Build ConnectionConfig from CakePHP Datasources"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Inclitoleo\\Mysql\\Laravel\\DbMysqlServiceProvider"
+            ]
+        }
     },
     "scripts": {
         "test": "phpunit",
